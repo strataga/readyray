@@ -1,0 +1,639 @@
+openapi: 3.1.0
+info:
+  title: ArchGauge API
+  version: 1.0.0
+  description: Public contract for identity, workspaces, evidence archive uploads, and service health.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+tags:
+  - name: identity
+  - name: workspaces
+  - name: evidence
+  - name: operations
+paths:
+  /v1/users:
+    post:
+      operationId: registerUser
+      tags: [identity]
+      summary: Register an account
+      description: Creates an account. Registration does not create a session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterUserRequest'
+      responses:
+        '201':
+          description: User registered.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/sessions:
+    post:
+      operationId: createSession
+      tags: [identity]
+      summary: Create a bearer session
+      description: >-
+        Limited to 10 requests per source and 10 per normalized account email
+        in a 15-minute window. If account tracking reaches capacity, new account
+        keys are untracked while source throttling remains active. If source
+        tracking reaches capacity, new sources are rejected with 429 until
+        tracking capacity becomes available.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '201':
+          description: Session created.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/sessions/current:
+    delete:
+      operationId: revokeCurrentSession
+      tags: [identity]
+      summary: Revoke the current bearer session
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Session revoked; the token can no longer authorize requests.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/workspaces:
+    post:
+      operationId: createWorkspace
+      tags: [workspaces]
+      summary: Create a workspace owned by the current user
+      description: Creates a workspace and grants the authenticated caller the owner role.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspaceRequest'
+      responses:
+        '201':
+          description: Workspace created with the caller as owner.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    get:
+      operationId: listWorkspaces
+      tags: [workspaces]
+      summary: List workspaces visible to the current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Workspaces where the authenticated caller is a member.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Workspace'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/workspaces/{workspaceId}/evidence/archives:
+    post:
+      operationId: uploadEvidenceArchive
+      tags: [evidence]
+      summary: Upload a bounded evidence ZIP archive
+      description: Workspace members may upload raw ZIP bytes. Every archive member is validated and scanned before the accepted archive and metadata are stored.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema:
+              type: string
+              format: binary
+              maxLength: 52428800
+      responses:
+        '201':
+          description: Evidence archive accepted and stored after validation and secret scanning.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceArchiveIntake'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/UploadBusy'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/workspaces/{workspaceId}/evidence/archives/{intakeId}:
+    get:
+      operationId: getEvidenceArchiveInventory
+      tags: [evidence]
+      summary: Read accepted evidence archive inventory
+      description: Returns accepted intake metadata, manifest, and SHA-256 digests for a workspace member. Archive bytes are never returned.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: intakeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Accepted evidence archive inventory.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceArchiveInventory'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/health/live:
+    get:
+      operationId: getLiveness
+      tags: [operations]
+      summary: Process liveness
+      security: []
+      responses:
+        '200':
+          description: The API process is running.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/health/ready:
+    get:
+      operationId: getReadiness
+      tags: [operations]
+      summary: Dependency readiness
+      security: []
+      responses:
+        '200':
+          description: Required dependencies are ready.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+components:
+  headers:
+    RequestId:
+      description: Correlation identifier assigned to this request.
+      schema:
+        type: string
+        format: uuid
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Opaque session token
+      description: Opaque random bearer token; the server stores only its SHA-256 digest.
+  responses:
+    BadRequest:
+      description: The request body is invalid.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: Credentials are invalid or a bearer session is missing or invalid.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: The caller cannot ingest evidence into this workspace.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: The requested accepted evidence archive was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnsupportedMediaType:
+      description: The request must use application/zip content.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnprocessableEntity:
+      description: The archive was rejected during evidence validation.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: A required service is unavailable.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: The source limit or a tracked account limit was exceeded, or source-tracking capacity is saturated. Account-tracking saturation falls back to source-only throttling.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until the active source and account limits may be retried.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UploadBusy:
+      description: An evidence upload is already in progress in this API process.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PayloadTooLarge:
+      description: The request body or evidence archive exceeds its allowed size.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: An account with this email already exists.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalServerError:
+      description: The request could not be completed.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    RegisterUserRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 12
+          maxLength: 128
+    CreateSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 1
+          maxLength: 128
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, email, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        createdAt:
+          type: string
+          format: date-time
+    Session:
+      type: object
+      additionalProperties: false
+      required: [accessToken, tokenType, expiresAt]
+      properties:
+        accessToken:
+          type: string
+          minLength: 1
+          description: Opaque random bearer token. Treat as a secret; the server stores only its SHA-256 digest.
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresAt:
+          type: string
+          format: date-time
+    CreateWorkspaceRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: '.*\S.*'
+    Workspace:
+      type: object
+      additionalProperties: false
+      required: [id, name, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 120
+        createdAt:
+          type: string
+          format: date-time
+    EvidenceArchiveIntake:
+      type: object
+      additionalProperties: false
+      required: [intakeId, status, workspaceId, archiveSha256, digests]
+      properties:
+        intakeId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [accepted]
+        workspaceId:
+          type: string
+          format: uuid
+        archiveSha256:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        digests:
+          type: array
+          maxItems: 5000
+          items:
+            $ref: '#/components/schemas/EvidenceFileDigest'
+    EvidenceFileDigest:
+      type: object
+      additionalProperties: false
+      required: [path, algorithm, hexDigest, byteSize]
+      properties:
+        path:
+          type: string
+        algorithm:
+          type: string
+          enum: [sha256]
+        hexDigest:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        byteSize:
+          type: integer
+          minimum: 0
+    EvidenceArchiveInventory:
+      type: object
+      additionalProperties: false
+      required: [intakeId, status, workspaceId, archiveSha256, createdAt, updatedAt, manifest, digests]
+      properties:
+        intakeId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [accepted]
+        workspaceId:
+          type: string
+          format: uuid
+        archiveSha256:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        manifest:
+          $ref: '#/components/schemas/EvidenceManifest'
+        digests:
+          type: array
+          maxItems: 5000
+          items:
+            $ref: '#/components/schemas/EvidenceFileDigest'
+    EvidenceManifest:
+      type: object
+      additionalProperties: false
+      required: [totalBytes, entries]
+      properties:
+        totalBytes:
+          type: integer
+          minimum: 0
+          maximum: 262144000
+        entries:
+          type: array
+          maxItems: 5000
+          items:
+            $ref: '#/components/schemas/EvidenceManifestEntry'
+    EvidenceManifestEntry:
+      type: object
+      additionalProperties: false
+      required: [path, byteSize]
+      properties:
+        path:
+          type: string
+        byteSize:
+          type: integer
+          minimum: 0
+        mediaType:
+          type: string
+          maxLength: 255
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, ready]
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details response.
+      required: [type, title, status, detail, instance, code, requestId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        requestId:
+          type: string
+          format: uuid
+          description: Correlation identifier assigned to every HTTP request.
+        code:
+          type: string
+          minLength: 1
+          description: Stable ArchGauge problem code extension.
+      additionalProperties: true

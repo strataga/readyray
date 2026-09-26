@@ -4,5 +4,21 @@
   "private": true,
   "type": "module",
   "packageManager": "bun@1.4.0",
-  "engines": { "node": ">=24 <25" }
+  "engines": { "node": ">=24 <25" },
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:api": "bun run --cwd packages/evidence build && bun run --cwd apps/api start:dev",
+    "dev:web": "bun run --cwd apps/web dev",
+    "build": "bun run --cwd packages/evidence build && bun run --cwd packages/reviews build && bun run --cwd apps/api build && bun run --cwd apps/web build",
+    "lint": "bun run --filter '@archgauge/*' lint",
+    "typecheck": "bun run --cwd packages/evidence build && bun run --cwd packages/reviews build && bun run --filter '@archgauge/*' typecheck",
+    "test": "bun run build && bun test apps/api/tests apps/web/tests packages/evidence/tests packages/reviews/tests",
+    "test:coverage": "bun run build && bun test --coverage apps/api/tests apps/web/tests packages/evidence/tests packages/reviews/tests"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.11.0",
+    "typescript": "5.9.2",
+    "typescript-eslint": "8.70.1"
+  }
 }

@@ -1,0 +1,24 @@
+{
+  "name": "@archgauge/reviews",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./domain": {
+      "types": "./dist/domain/index.d.ts",
+      "import": "./dist/domain/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint --config ../../eslint.config.js index.ts \"domain/**/*.ts\" \"tests/**/*.test.ts\"",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

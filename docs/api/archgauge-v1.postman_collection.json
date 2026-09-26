@@ -1,0 +1,173 @@
+{
+  "info": {
+    "name": "ArchGauge API v1",
+    "description": "Public API requests for identity, workspaces, evidence archive uploads, and health. accessToken is an opaque random bearer token; the server stores only its SHA-256 digest.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Register user",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/v1/users"
+      }
+    },
+    {
+      "name": "Create bearer session",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/v1/sessions"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  const body = pm.response.json();",
+              "  if (typeof body.accessToken === 'string' && body.accessToken.length > 0) {",
+              "    pm.collectionVariables.set('accessToken', body.accessToken);",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Revoke current session",
+      "request": {
+        "method": "DELETE",
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "url": "{{baseUrl}}/v1/sessions/current"
+      }
+    },
+    {
+      "name": "Create owned workspace",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{workspaceName}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": "{{baseUrl}}/v1/workspaces"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  const body = pm.response.json();",
+              "  if (typeof body.id === 'string' && body.id.length > 0) {",
+              "    pm.collectionVariables.set('workspaceId', body.id);",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List caller's workspaces",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "url": "{{baseUrl}}/v1/workspaces"
+      }
+    },
+    {
+      "name": "Upload evidence ZIP archive",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/zip" }],
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "body": {
+          "mode": "file",
+          "file": { "src": "" }
+        },
+        "url": "{{baseUrl}}/v1/workspaces/{{workspaceId}}/evidence/archives",
+        "description": "Select a local ZIP file in the file body before sending. The archive must pass validation and secret scanning."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  const body = pm.response.json();",
+              "  if (typeof body.intakeId === 'string' && body.intakeId.length > 0) {",
+              "    pm.collectionVariables.set('intakeId', body.intakeId);",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read evidence archive inventory",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "url": "{{baseUrl}}/v1/workspaces/{{workspaceId}}/evidence/archives/{{intakeId}}"
+      }
+    },
+    {
+      "name": "Health live",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/v1/health/live"
+      }
+    },
+    {
+      "name": "Health ready",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/v1/health/ready"
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "userEmail", "value": "developer@example.test" },
+    { "key": "password", "value": "local-development-only" },
+    { "key": "accessToken", "value": "" },
+    { "key": "workspaceName", "value": "Local development workspace" },
+    { "key": "workspaceId", "value": "" },
+    { "key": "intakeId", "value": "" }
+  ]
+}
